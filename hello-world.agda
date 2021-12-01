@@ -112,4 +112,143 @@ from (x I) = from x * 2 + 1
   ∎
 
 
+identityʳ : ∀ (m : ℕ) → m + zero ≡ m
+identityʳ zero = refl
+identityʳ (suc z) =
+    begin
+      suc z + zero
+    ≡⟨⟩
+      suc (z + zero)
+    ≡⟨ cong suc (identityʳ z) ⟩
+      suc z
+    ∎
 
++-suc : ∀ (m n : ℕ) → m + suc n ≡ suc (m + n)
++-suc zero n = refl
++-suc (suc m) n =
+    begin
+      suc m + suc n
+    ≡⟨⟩
+      suc (m + suc n)
+    ≡⟨ cong suc (+-suc m n) ⟩
+      suc (suc (m + n))
+    ≡⟨⟩
+      suc (suc m + n)
+    ∎
+     
++-comm : ∀ (m n : ℕ) → m + n ≡ n + m
++-comm m zero =
+    begin
+      m + zero
+    ≡⟨ identityʳ m ⟩
+      m
+    ≡⟨⟩
+      zero + m
+    ∎
++-comm m (suc n) =
+    m + suc n
+  ≡⟨ +-suc m n ⟩
+    suc (m + n)
+  ≡⟨ cong suc (+-comm m n) ⟩
+    suc (n + m)
+  ≡⟨⟩
+    suc n + m
+  ∎
+
++-rearrange : ∀ (m n p q : ℕ) → (m + n) + (p + q) ≡ m + (n + p) + q
++-rearrange m n p q =
+  begin
+      (m + n) + (p + q)
+    ≡⟨ (+-assoc m n (p + q)) ⟩
+      m + (n + (p + q))
+    ≡⟨ cong (m +_) (sym (+-assoc n p q)) ⟩
+        m + (n + p + q)
+    ≡⟨ sym (+-assoc m (n + p) q) ⟩
+        (m + (n + p)) + q
+    ∎
+
+
++-assoc' : ∀ (m n p : ℕ) → (m + n) + p ≡ m + (n + p)
++-assoc' zero    n p                        = refl
++-assoc' (suc m) n p rewrite +-assoc' m n p = refl
+
+
++-identity' : ∀ (n : ℕ) → n + zero ≡ n
++-identity' zero = refl
++-identity' (suc n) rewrite +-identity' n = refl
+
+*-identity' : ∀ (n : ℕ) → n * 1 ≡ n
+*-identity' zero = refl
+*-identity' (suc n) rewrite *-identity' n = refl
+
+*-ann : ∀ (n : ℕ) → n * 0 ≡ 0
+*-ann zero = refl
+*-ann (suc n) rewrite *-ann n = refl
+
+
++-suc' : ∀ (m n : ℕ) → m + suc n ≡ suc (m + n)
++-suc' zero n = refl
++-suc' (suc m) n rewrite +-suc' m n = refl
+
+*-suc' : ∀ (m n : ℕ) → m * suc n ≡ m + (m * n)
+*-suc' zero n    = refl
+*-suc' (suc m) n
+  rewrite *-suc' m n
+         | sym (+-assoc' m n (m * n))
+         | sym (+-assoc' n m (m * n))
+         | +-comm n m 
+         = refl
+
+
++-comm' : ∀ (m n : ℕ) → m + n ≡ n + m
++-comm' m zero    rewrite +-identity' m = refl
++-comm' m (suc n) rewrite +-suc' m n | +-comm' m n = refl
+
+
+*-comm' : ∀ (m n : ℕ) → m * n ≡ n * m
+*-comm' m zero    rewrite *-identity' m | *-ann m = refl
+*-comm' m (suc n) rewrite *-suc' m n | *-comm' m n = refl
+
+swap : ∀ (m n p : ℕ) → m + (n + p) ≡ n + (m + p)
+swap m n p
+  rewrite sym (+-assoc m n p)
+        | +-comm m n
+        | +-assoc n m p
+        = refl
+
+suc-+-suc : ∀ (m n : ℕ) → suc m + n ≡ m + suc n
+suc-+-suc zero n = refl
+suc-+-suc (suc m) n =
+  begin
+      suc (suc m) + n
+    ≡⟨ cong suc (suc-+-suc m n) ⟩
+      suc m + suc n
+    ∎
+
+
+*-distrib-+ : ∀ (m n p : ℕ) → (m + n) * p ≡ m * p + n * p
+*-distrib-+ zero n p = refl
+*-distrib-+ (suc m) n p
+  rewrite *-distrib-+ m n p
+        | +-assoc p (m * p) (n * p)
+        = refl
+
+
+*-assoc' : ∀ (m n p : ℕ) → (m * n) * p ≡ m * (n * p)
+*-assoc' zero    n p = refl
+*-assoc' (suc m) n p
+  rewrite *-assoc' m n p
+        | *-distrib-+ n (m * n) p
+        | *-assoc' m n p
+        = refl
+
+
+
+    
+
+-- *-distrib-+ m n zero
+--   rewrite *-ann (m + n)
+--         | *-ann m
+--         | *-ann n
+--         = refl
+-- *-distrib-+ m n (suc p) = {!!}
