@@ -7,7 +7,7 @@ import Data.Bool
 import Data.Vec as Vec
 import Relation.Binary.PropositionalEquality as Eq
 import Data.Unit
-open Data.Unit
+open Data.Unit using (⊤; tt)
 open Eq using (_≡_; refl; cong; sym)
 open Eq.≡-Reasoning using (begin_; _≡⟨⟩_; _∎; step-≡)
 open Data.Nat
@@ -16,7 +16,8 @@ open Data.Product
 open Data.Sum
 open Vec using (Vec; _∷_; [])
 import Data.Nat.Properties
-open Data.Nat.Properties using (⊔-comm; +-comm)
+open Data.Nat.Properties using (⊔-comm; +-comm; m≤m⊔n; m≤n⊔m)
+
 
 record Equiv {obj : Set} (_≈_ : obj → obj → Set) : Set where
   field
@@ -113,23 +114,55 @@ vec-drop {m = suc m} {v2 = v2} (x ∷ v) =
     ∎
 
 
+rpad : ∀ {A} {m n} → m ≤ n → A → Vec A m → Vec A n
+rpad z≤n a [] = Vec.replicate a
+rpad (s≤s proof) a (x ∷ v) = x ∷ rpad proof a v
+
+enough : ∀ {A} {m n} → m ≤ n → Vec A n → Vec A m
+enough z≤n v = []
+enough (s≤s proof) (x ∷ v) = x ∷ enough proof v
+
+rpad-enough : ∀ {A} {m n} {a} → (proof : m ≤ n) → (v : Vec A m) → enough proof (rpad proof a v) ≡ v
+rpad-enough z≤n [] = refl
+rpad-enough (s≤s proof) (x ∷ v) = cong (x ∷_) (rpad-enough proof v)
 
 instance 
-  -- SumEmbed : ∀ {A B} → {{ea : Embed A}} → {{eb : Embed B}} → Embed (A ⊎ B)
-  -- Embed.size (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) = 1 + (Embed.size ea ⊔ Embed.size eb)
-  -- Embed.embed (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) (inj₁ x) rewrite ⊔-comm (Embed.size ea) (Embed.size eb) = false ∷ fill (Embed.size eb) (Embed.embed ea x) false
-  -- Embed.embed (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) (inj₂ y) = true ∷ fill (Embed.size ea) (Embed.embed eb y) false
-  -- Embed.reify (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) (false ∷ x) = inj₁ (Embed.reify ea (enough (Embed.size ea) x))
-  -- Embed.reify (SumEmbed ⦃ ea = ea ⦄ {{ eb }}) (true ∷ y) rewrite ⊔-comm (Embed.size ea) (Embed.size eb) = inj₂ (Embed.reify eb (enough (Embed.size eb) y))
-  -- Embed.reify-embed (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) (inj₁ x) = {!!}
-  -- Embed.reify-embed (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) (inj₂ y) = 
-  --   begin
-  --     Embed.reify SumEmbed (Embed.embed SumEmbed (inj₂ y))
-  --   ≡⟨⟩
-  --     Embed.reify SumEmbed (true ∷ fill (Embed.size ea) (Embed.embed eb y) false)
-  --   ≡⟨ {!!} ⟩
-  --     inj₂ y
-  --   ∎
+  open Embed
+
+  SumEmbed : ∀ {A B} → {{ea : Embed A}} → {{eb : Embed B}} → Embed (A ⊎ B)
+  size (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) = 1 + (size ea ⊔ size eb)
+  embed (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) (inj₁ x) = false ∷ rpad (m≤m⊔n (size ea) (size eb)) false (embed ea x)
+  embed (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) (inj₂ y) = true ∷ rpad (m≤n⊔m (size ea) (size eb)) false (embed eb y)
+  reify (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) (false ∷ x) = inj₁ (reify ea (enough (m≤m⊔n (size ea) (size eb)) x))
+  reify (SumEmbed ⦃ ea = ea ⦄ {{ eb }}) (true ∷ y) = inj₂ (reify eb (enough (m≤n⊔m (size ea) (size eb)) y))
+  reify-embed (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) (inj₁ a) =
+    let sz = m≤m⊔n (size ea) (size eb)
+     in
+    begin
+      reify SumEmbed (embed SumEmbed (inj₁ a))
+    ≡⟨⟩
+      reify SumEmbed (false ∷ rpad sz false (embed ea a))
+    ≡⟨⟩
+      inj₁ (reify ea (enough sz (rpad sz false (embed ea a))))
+    ≡⟨ cong ( λ x → inj₁ (reify ea x) ) (rpad-enough sz (embed ea a)) ⟩
+      inj₁ (reify ea (embed ea a))
+    ≡⟨ cong inj₁ (reify-embed ea a) ⟩
+      inj₁ a
+    ∎
+  reify-embed (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) (inj₂ b) =
+    let sz = m≤n⊔m (size ea) (size eb)
+     in
+    begin
+      reify SumEmbed (embed SumEmbed (inj₂ b))
+    ≡⟨⟩
+      reify SumEmbed (true ∷ rpad sz false (embed eb b))
+    ≡⟨⟩
+      inj₂ (reify eb (enough sz (rpad (m≤n⊔m (size ea) (size eb)) false (embed eb b))))
+    ≡⟨ cong ( λ x → inj₂ (reify eb x) ) (rpad-enough sz (embed eb b)) ⟩
+      inj₂ (reify eb (embed eb b))
+    ≡⟨ cong inj₂ (reify-embed eb b) ⟩
+      inj₂ b
+    ∎
 
   UnitEmbed : Embed ⊤
   UnitEmbed =
@@ -147,7 +180,6 @@ instance
            ; reify-embed = λ x → refl 
            }
 
-  open Embed
   ProdEmbed : ∀ {A B} → {{ea : Embed A}} → {{eb : Embed B}} → Embed (A × B)
   size (ProdEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) = size ea + size eb
   embed (ProdEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) = λ (a , b) → embed ea a Vec.++ embed eb b 
