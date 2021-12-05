@@ -1,5 +1,7 @@
 {-# OPTIONS --type-in-type #-}
 
+module Embed where
+
 import Data.Nat
 import Data.Product
 import Data.Sum
@@ -19,65 +21,13 @@ import Data.Nat.Properties
 open Data.Nat.Properties using (⊔-comm; +-comm; m≤m⊔n; m≤n⊔m)
 
 
-record Equiv {obj : Set} (_≈_ : obj → obj → Set) : Set where
-  field
-    ≈-refl : ∀ {f} → f ≈ f 
-    ≈-sym : ∀ {f g} → f ≈ g → g ≈ f
-    ≈-trans : ∀ {f g h} → f ≈ g → g ≈ h → f ≈ h
-
-record Cat {obj : Set} (_⇒_ : obj → obj → Set) : Set where
-  infixr 9 _∘_
-  infixr 5 _≈_
-  field
-    id : {a : obj} → a ⇒ a
-    _∘_ : {a b c : obj} → (b ⇒ c) → (a ⇒ b) → (a ⇒ c)
-    _≈_ : {a b : obj} → (f g : a ⇒ b) → Set
-
-    idᴸ : {a b : obj} → {f : a ⇒ b} → id ∘ f ≈ f
-    idᴿ : {a b : obj} → {f : a ⇒ b} → f ≈ f ∘ id
-    ∘-assoc : {a b c d : obj} → {f : a ⇒ b} → {g : b ⇒ c} → {h : c ⇒ d} → h ∘ (g ∘ f) ≈ (h ∘ g) ∘ f
-
-    ≈-equiv : ∀ {x y} → Equiv (_≈_ {x} {y})
-
-data _⇛_  : Set → Set → Set where
-  free-id : {a : Set} → a ⇛ a
-  comp : {a b c : Set} → (b ⇛ c) → (a ⇛ b) → (a ⇛ c)
-
-eval : {A B C : Set} → (B ⇛ C) → (A ⇛ B) → (A ⇛ C)
-eval free-id f = f
-eval (comp h g) f = eval h (eval g f)
-
-normalize : ∀ {A B} → (A ⇛ B) → (A ⇛ B)
-normalize f = eval f free-id
-
-record _≅_ {A B : Set} (f g : A ⇛ B) : Set where
-  constructor norm-refl
-  field
-    nf-eq : normalize f ≡ normalize g
-      
-
-⇛-cat : Cat _⇛_ 
-⇛-cat = record
-  { id = free-id
-  ; _∘_ = comp
-  ; _≈_ = _≅_
-  ; idᴸ = norm-refl refl
-  ; idᴿ = norm-refl refl
-  ; ∘-assoc = norm-refl refl
-  ; ≈-equiv = record
-    { ≈-refl = norm-refl refl
-    ; ≈-sym = λ (norm-refl x) → norm-refl (sym x)
-    ; ≈-trans = λ (norm-refl f) (norm-refl g) → norm-refl (Eq.trans f g)
-    }
-  }
-
-
 record Embed (A : Set) : Set where
   field
     size : ℕ
     embed : A → Vec Bool size
     reify : Vec Bool size → A
     reify-embed : (x : A) → reify (embed x) ≡ x
+
 
 take : ∀ {A} {m n} → Vec A (m + n) → Vec A m
 take {m = zero} v = []
@@ -197,7 +147,7 @@ instance
       reify ea (take v) , reify eb (drop v)
     ≡⟨ cong (λ x → reify ea x , reify eb (drop v) ) (vec-take embeda) ⟩
       reify ea embeda , reify eb (drop v)
-    ≡⟨ cong (λ x → reify ea embeda , reify eb x) (vec-drop embeda) ⟩
+    ≡⟨ cong (λ x → _ , reify eb x) (vec-drop embeda) ⟩
       reify ea embeda , reify eb embedb
     ≡⟨ cong (Data.Product._, (reify eb embedb)) (reify-embed ea a) ⟩
       a , reify eb embedb
