@@ -81,8 +81,8 @@ instance
 
   SumEmbed : ∀ {A B} → {{ea : Embed A}} → {{eb : Embed B}} → Embed (A ⊎ B)
   size (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) = 1 + (size ea ⊔ size eb)
-  embed (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) (inj₁ x) = false ∷ rpad (m≤m⊔n (size ea) (size eb)) false (embed ea x)
-  embed (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) (inj₂ y) = true ∷ rpad (m≤n⊔m (size ea) (size eb)) false (embed eb y)
+  embed (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) (inj₁ a) = false ∷ rpad (m≤m⊔n (size ea) (size eb)) false (embed ea a)
+  embed (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) (inj₂ b) = true ∷ rpad (m≤n⊔m (size ea) (size eb)) false (embed eb b)
   reify (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) (false ∷ x) = inj₁ (reify ea (enough (m≤m⊔n (size ea) (size eb)) x))
   reify (SumEmbed ⦃ ea = ea ⦄ {{ eb }}) (true ∷ y) = inj₂ (reify eb (enough (m≤n⊔m (size ea) (size eb)) y))
   reify-embed (SumEmbed ⦃ ea = ea ⦄ ⦃ eb ⦄) (inj₁ a) =
