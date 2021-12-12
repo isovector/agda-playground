@@ -9,10 +9,6 @@ data _==_ {A : Set} : A → A → Set where
 {-# BUILTIN EQUALITY _==_ #-}
 
 
-cong : forall {f g a b} -> f == g -> a == b -> a f == g b
-cong fg ab rewrite fg | ab = refl _
-
-
 postulate
   extensionality : {S : Set}{T : S -> Set}
                    {f g : (x : S) -> T x} ->
@@ -32,7 +28,7 @@ record Category : Set where
 
     id-l : {A B : Obj} {f : A ~> B} → id >> f == f
     id-r : {A B : Obj} {f : A ~> B} → f >> id == f
-    >>-assoc : {A B C D : Obj} {f : A ~> B}{g : B ~> C}{h : C ~> D} → f >> (g >> h) == (f >> g) >> h
+    >>-assoc : {A B C D : Obj} (f : A ~> B) → (g : B ~> C) → (h : C ~> D) → f >> (g >> h) == (f >> g) >> h
 
 
 _[_,_] : (C : Category) -> Category.Obj C -> Category.Obj C -> Set
@@ -50,7 +46,7 @@ SET = record
         ; _>>_ = λ f g x →  g (f x)
         ; id-l = refl _
         ; id-r = refl _
-        ; >>-assoc = refl _
+        ; >>-assoc = \f g h -> refl _
         }
 
 
@@ -63,8 +59,9 @@ module FUNCTOR where
         F-Obj : Obj C → Obj D
         F-map : {A B : Obj C} → C [ A , B ] → D [ F-Obj A , F-Obj B ]
 
-        F-map-id : {A : Obj C} → F-map (id C {A}) == id D
-        F-map->> : {X Y Z : Obj C} {f : C [ X ,  Y ]} {g : C [ Y ,  Z ]} → F-map ( C [ f >> g ]) == D [ F-map f >> F-map g ]
+        F-map-id : (A : Obj C) → F-map (id C {A}) == id D
+        F-map->> : {X Y Z : Obj C} (f : C [ X ,  Y ]) → (g : C [ Y ,  Z ]) → F-map ( C [ f >> g ]) == D [ F-map f >> F-map g ]
+
 
 
 open FUNCTOR
@@ -73,8 +70,8 @@ ID=> : {C : Category} → C => C
 ID=> = record
      { F-Obj = λ x → x
      ; F-map = λ x → x
-     ; F-map-id = refl (Category.id _)
-     ; F-map->> = refl _
+     ; F-map-id = \a → refl _
+     ; F-map->> = \f g -> refl _
      }
 
 data Maybe (A : Set) : Set where
@@ -85,8 +82,8 @@ MAYBE : SET => SET
 MAYBE = record
   { F-Obj = Maybe
   ; F-map = λ { f (just x) → just (f x) ; f nothing → nothing }
-  ; F-map-id = extensionality λ { (just x) → refl _ ; nothing → refl _ }
-  ; F-map->> = extensionality λ { (just x) → refl _ ; nothing → refl _ }
+  ; F-map-id = \a -> extensionality λ { (just x) → refl _ ; nothing → refl _ }
+  ; F-map->> = \f g -> extensionality λ { (just x) → refl _ ; nothing → refl _ }
   }
 
 infixr 10 _,-_
@@ -102,18 +99,18 @@ LIST : SET => SET
 LIST = record
   { F-Obj = List
   ; F-map =  list
-  ; F-map-id = extensionality help
-  ; F-map->> = extensionality λ { x → yelp x }
+  ; F-map-id = \a -> extensionality help
+  ; F-map->> = \f g -> extensionality λ { x → yelp f g x }
   }
   where
     help : {A : Set} (x : List A) → list (λ x → x) x == x
     help [] = refl _
     help (x ,- xs) rewrite help xs = refl (x ,- xs)
 
-    yelp : ∀ {X} {Y} {Z} {f : SET [ X , Y ]} {g : SET [ Y , Z ]}
+    yelp : ∀ {X} {Y} {Z} (f : SET [ X , Y ]) (g : SET [ Y , Z ])
          (x : List X) → list (SET [ f >> g ]) x == (SET [ list f >> list g ]) x
-    yelp [] = refl []
-    yelp {f = f} {g = g} (x ,- xs) rewrite yelp xs = ?
+    yelp f g [] = refl []
+    yelp f g (x ,- xs) rewrite yelp f g xs = refl _
 
 
 
@@ -132,7 +129,4 @@ LIST_TO_MAYBE = record
   { hoist = λ { X [] → nothing ; X (x ,- _) → just x }
   ; nat = extensionality λ { [] → refl _ ; (x ,- x₁) → refl _ }
   }
-
-
-
 
