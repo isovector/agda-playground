@@ -137,12 +137,12 @@ to-nat-bounded : {n : Nat} -> (v : Vec Value n) -> to-nat v < 2 ^ n
 to-nat-bounded [] = s<=s z<=
 to-nat-bounded {suc n} (b ,- v) = trust-me
 
-full-add-carry : (carry-in : Value) -> Value -> Value -> Vec Value 2
-full-add-carry cin a b =
+full-add : (carry-in : Value) -> Value -> Value -> Vec Value 2
+full-add cin a b =
   let o = xor a b
    in xor o cin ,- or (and a b) (and o cin) ,- []
 
-full-add-is-add : (x y z : Value) -> to-nat (full-add-carry x y z) == to-bit x + to-bit y + to-bit z
+full-add-is-add : (x y z : Value) -> to-nat (full-add x y z) == to-bit x + to-bit y + to-bit z
 full-add-is-add high high high = refl
 full-add-is-add high high low = refl
 full-add-is-add high low high = refl
@@ -154,7 +154,7 @@ full-add-is-add low low low = refl
 
 ripple-carry : {n : Nat} -> Value -> Vec Value n -> Vec Value n -> Vec Value (suc n)
 ripple-carry cin [] [] = cin ,- []
-ripple-carry cin (x ,- xs) (y ,- ys) with full-add-carry cin x y
+ripple-carry cin (x ,- xs) (y ,- ys) with full-add cin x y
 ... | sum ,- cout ,- [] = sum ,- ripple-carry cout xs ys
 
 data Either (A B : Set) : Set where
@@ -186,31 +186,26 @@ open +-*-Solver
 *-distrib : (a b c : Nat) -> a * (b + c) == a * b + a * c
 *-distrib = solve 3 (\a b c -> a :* (b :+ c) := a :* b :+ a :* c) refl
 
-ripple-carry-is-add : {n : Nat} (cin : Value) (xs ys : Vec Value n) -> to-bit cin + to-nat xs + to-nat ys == to-nat (ripple-carry cin xs ys)
-ripple-carry-is-add cin [] [] rewrite n+zero (to-bit cin) = n+zero (to-bit cin)
-ripple-carry-is-add cin (x ,- xs) (y ,- ys) = sym (
+disolve : {A : Set}{n : Nat} {v1 v2 : Vec A n} -> (ix : Fin n) -> v1 == v2 -> lookup v1 ix == lookup v2 ix
+disolve ix proof rewrite proof = refl
+
+ripple-carry-is-add : {n : Nat} (cin : Value) (xs ys : Vec Value n) -> to-nat (ripple-carry cin xs ys) == to-bit cin + to-nat xs + to-nat ys
+ripple-carry-is-add cin [] [] rewrite n+zero (to-bit cin) = sym (n+zero (to-bit cin))
+ripple-carry-is-add cin (x ,- xs) (y ,- ys) with full-add cin x y | inspect (\cin -> full-add cin x y) cin
+... | sum ,- cout ,- [] | [ eq ] =
   begin
     to-nat (ripple-carry cin (x ,- xs) (y ,- ys))
   =[]
+    to-nat (_ ,- ripple-carry _ xs ys)
+  =[ cong (\p -> to-nat (p ,- ripple-carry _ xs ys)) (disolve fz eq) ]
+    to-nat (sum ,- ripple-carry _ xs ys)
+  =[ cong (\p -> to-nat (sum ,- ripple-carry p xs ys)) (disolve (fs fz) eq) ]
     to-nat (sum ,- ripple-carry cout xs ys)
   =[]
     to-bit sum + 2 * to-nat (ripple-carry cout xs ys)
-  =[ cong (\p -> to-bit sum + 2 * p) (sym (ripple-carry-is-add cout xs ys)) ]
-    to-bit sum + 2 * ((to-bit cout + to-nat xs) + to-nat ys)
-  =[ {!!} ]
-    to-bit sum + 2 * (to-bit cout + to-nat xs) + 2 * (to-nat ys)
-  =[ {!!} ]
-    to-bit sum + (2 * to-bit cout + 2 * to-nat xs) + 2 * (to-nat ys)
-  =[ {!!} ]
-    to-bit cin + (to-bit x + 2 * to-nat xs) + (to-bit y + 2 * to-nat ys)
-  =[]
-    to-bit cin + to-nat (x ,- xs) + to-nat (y ,- ys)
+  =[ cong (\p -> to-bit sum + 2 * p) (ripple-carry-is-add cout xs ys) ]
+    to-bit sum + 2 * (to-bit cout + to-nat xs + to-nat ys)
+  =[ ? ]
+    (to-bit cin + (to-bit x + 2 * to-nat xs)) + (to-bit y + 2 * to-nat ys)
   done
-    )
-  where
-    sum : Value
-    sum = xor (xor x y) cin
-
-    cout : Value
-    cout = or (and x y) (and (xor x y) cin)
 
