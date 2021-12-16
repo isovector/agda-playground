@@ -189,23 +189,66 @@ open +-*-Solver
 disolve : {A : Set}{n : Nat} {v1 v2 : Vec A n} -> (ix : Fin n) -> v1 == v2 -> lookup v1 ix == lookup v2 ix
 disolve ix proof rewrite proof = refl
 
-ripple-carry-is-add : {n : Nat} (cin : Value) (xs ys : Vec Value n) -> to-nat (ripple-carry cin xs ys) == to-bit cin + to-nat xs + to-nat ys
-ripple-carry-is-add cin [] [] rewrite n+zero (to-bit cin) = sym (n+zero (to-bit cin))
-ripple-carry-is-add cin (x ,- xs) (y ,- ys) with full-add cin x y | inspect (\cin -> full-add cin x y) cin
-... | sum ,- cout ,- [] | [ eq ] =
+
+ripple-carry-is-add
+    : {n : Nat} (cin : Value) (xs ys : Vec Value n)
+   -> to-nat (ripple-carry cin xs ys) == to-bit cin + to-nat xs + to-nat ys
+ripple-carry-is-add cin [] []
+    rewrite n+zero (to-bit cin)
+       = sym (n+zero (to-bit cin))
+ripple-carry-is-add cin (x ,- xs) (y ,- ys) =
   begin
     to-nat (ripple-carry cin (x ,- xs) (y ,- ys))
-  =[]
-    to-nat (_ ,- ripple-carry _ xs ys)
-  =[ cong (\p -> to-nat (p ,- ripple-carry _ xs ys)) (disolve fz eq) ]
-    to-nat (sum ,- ripple-carry _ xs ys)
-  =[ cong (\p -> to-nat (sum ,- ripple-carry p xs ys)) (disolve (fs fz) eq) ]
-    to-nat (sum ,- ripple-carry cout xs ys)
-  =[]
-    to-bit sum + 2 * to-nat (ripple-carry cout xs ys)
-  =[ cong (\p -> to-bit sum + 2 * p) (ripple-carry-is-add cout xs ys) ]
-    to-bit sum + 2 * (to-bit cout + to-nat xs + to-nat ys)
-  =[ ? ]
+  =[ lemma cin x y xs ys ]
+    to-nat (full-add cin x y) + 2 * to-nat (ripple-carry low xs ys)
+  =[ cong (\p -> to-nat (full-add cin x y) + 2 * p) (ripple-carry-is-add low xs ys) ]
+    to-nat (full-add cin x y) + 2 * (to-nat xs + to-nat ys)
+  =[ cong (\p -> to-nat (full-add cin x y) + p) (*-distrib 2 (to-nat xs) (to-nat ys)) ]
+    to-nat (full-add cin x y) + (2 * to-nat xs + 2 * to-nat ys)
+  =[ cong (\p -> p + (2 * to-nat xs + 2 * to-nat ys)) (full-add-is-add cin x y) ]
+    (to-bit cin + to-bit x + to-bit y) + (2 * to-nat xs + 2 * to-nat ys)
+  =[
+  solve 5 (\ a b c d e -> (a :+ b :+ c) :+ (con 2 :* d :+ con 2 :* e)
+                       := (a :+ (b :+ con 2 :* d)) :+ (c :+ con 2 :* e)
+             ) refl (to-bit cin)
+                    (to-bit x)
+                    (to-bit y)
+                    (to-nat xs)
+                    (to-nat ys) ]
     (to-bit cin + (to-bit x + 2 * to-nat xs)) + (to-bit y + 2 * to-nat ys)
   done
+  where
+    ripple-carry-high-is-succ : {n : Nat} -> (xs ys : Vec Value n) -> to-nat (ripple-carry high xs ys) == suc (to-nat (ripple-carry low xs ys))
+    ripple-carry-high-is-succ xs ys
+      rewrite ripple-carry-is-add high xs ys
+            | ripple-carry-is-add low xs ys
+            = refl
+
+    lemma : forall cin x y {n} (xs ys : Vec Value n) ->
+        to-nat (ripple-carry cin (x ,- xs) (y ,- ys)) ==
+        to-nat (full-add cin x y) + 2 * to-nat (ripple-carry low xs ys)
+    lemma high high high xs ys
+      rewrite ripple-carry-high-is-succ xs ys
+            | n+suc (to-nat (ripple-carry low xs ys))
+                    (to-nat (ripple-carry low xs ys) + 0)
+            = refl
+    lemma high high low xs ys
+      rewrite ripple-carry-high-is-succ xs ys
+            | n+suc (to-nat (ripple-carry low xs ys))
+                    (to-nat (ripple-carry low xs ys) + 0)
+            = refl
+    lemma high low high xs ys
+      rewrite ripple-carry-high-is-succ xs ys
+            | n+suc (to-nat (ripple-carry low xs ys))
+                    (to-nat (ripple-carry low xs ys) + 0)
+            = refl
+    lemma high low low xs ys = refl
+    lemma low high high xs ys
+      rewrite ripple-carry-high-is-succ xs ys
+            | n+suc (to-nat (ripple-carry low xs ys))
+                    (to-nat (ripple-carry low xs ys) + 0)
+            = refl
+    lemma low high low xs ys = refl
+    lemma low low high xs ys = refl
+    lemma low low low xs ys = refl
 
