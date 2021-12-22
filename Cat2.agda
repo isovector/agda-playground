@@ -2,11 +2,30 @@
 
 module Cat2 where
 
+open import Relation.Binary.PropositionalEquality renaming (_≡_ to _==_) hiding ([_])
+open import Tactic.Rewrite using (cong!)
 
 infix 1 _==_
-data _==_ {A : Set} : A → A → Set where
-  refl : (a : A) → a == a
-{-# BUILTIN EQUALITY _==_ #-}
+
+infix 3 _done
+infixr 2 _=[]_ step-=
+infix 1 begin_
+
+begin_ : {A : Set} -> A -> A
+begin_ x = x
+
+_=[]_ : {A : Set} (x : A) -> {y : A} -> x == y -> x == y
+_=[]_ _ x = x
+
+step-= : {A : Set} (x : A) -> {y z : A} -> y == z -> x == y -> x == z
+step-= _ yz xy = trans xy yz
+
+syntax step-= x yz xy = x =[ xy ] yz
+
+_done : {A : Set} -> (x : A) -> x == x
+_done _ = refl
+
+
 
 
 postulate
@@ -26,14 +45,16 @@ record Category : Set where
     id : {A : Obj} → A ~> A
     _>>_ : {A B C : Obj} → A ~> B → B ~> C → A ~> C
 
-    id-l : {A B : Obj} {f : A ~> B} → id >> f == f
-    id-r : {A B : Obj} {f : A ~> B} → f >> id == f
+    id-l : {A B : Obj} (f : A ~> B) → id >> f == f
+    id-r : {A B : Obj} (f : A ~> B) → f >> id == f
     >>-assoc : {A B C D : Obj} (f : A ~> B) → (g : B ~> C) → (h : C ~> D) → f >> (g >> h) == (f >> g) >> h
 
 
+infix 5 _[_,_]
 _[_,_] : (C : Category) -> Category.Obj C -> Category.Obj C -> Set
 C [ X , Y ] = Category._~>_ C X Y
 
+infix 5 _[_>>_]
 _[_>>_] : (C : Category) -> {X Y Z : Category.Obj C} -> C [ X , Y ] -> C [ Y , Z ] -> C [ X , Z ]
 C [ f >> g ] = Category._>>_ C f g
 
@@ -44,9 +65,9 @@ SET = record
         ; _~>_ = \ S T → S → T
         ; id = \ x → x
         ; _>>_ = λ f g x →  g (f x)
-        ; id-l = refl _
-        ; id-r = refl _
-        ; >>-assoc = \f g h -> refl _
+        ; id-l = \f -> refl
+        ; id-r = \f -> refl
+        ; >>-assoc = \f g h -> refl
         }
 
 
@@ -59,8 +80,8 @@ module FUNCTOR where
         F-Obj : Obj C → Obj D
         F-map : {A B : Obj C} → C [ A , B ] → D [ F-Obj A , F-Obj B ]
 
-        F-map-id : (A : Obj C) → F-map (id C {A}) == id D
-        F-map->> : {X Y Z : Obj C} (f : C [ X ,  Y ]) → (g : C [ Y ,  Z ]) → F-map ( C [ f >> g ]) == D [ F-map f >> F-map g ]
+        F-map-id : (A : Obj C) → F-map (id C {A}) == id D {F-Obj A}
+        F-map->> : {X Y Z : Obj C} (f : C [ X ,  Y ]) → (g : C [ Y ,  Z ]) → (F-map ( C [ f >> g ])) == (D [ F-map f >> F-map g ])
 
 
 
@@ -70,8 +91,8 @@ ID=> : {C : Category} → C => C
 ID=> = record
      { F-Obj = λ x → x
      ; F-map = λ x → x
-     ; F-map-id = \a → refl _
-     ; F-map->> = \f g -> refl _
+     ; F-map-id = \a → refl
+     ; F-map->> = \f g -> refl
      }
 
 data Maybe (A : Set) : Set where
@@ -82,8 +103,8 @@ MAYBE : SET => SET
 MAYBE = record
   { F-Obj = Maybe
   ; F-map = λ { f (just x) → just (f x) ; f nothing → nothing }
-  ; F-map-id = \a -> extensionality λ { (just x) → refl _ ; nothing → refl _ }
-  ; F-map->> = \f g -> extensionality λ { (just x) → refl _ ; nothing → refl _ }
+  ; F-map-id = \a -> extensionality λ { (just x) → refl ; nothing → refl }
+  ; F-map->> = \f g -> extensionality λ { (just x) → refl ; nothing → refl }
   }
 
 infixr 10 _,-_
@@ -104,13 +125,13 @@ LIST = record
   }
   where
     help : {A : Set} (x : List A) → list (λ x → x) x == x
-    help [] = refl _
-    help (x ,- xs) rewrite help xs = refl (x ,- xs)
+    help [] = refl
+    help (x ,- xs) rewrite help xs = refl
 
     yelp : ∀ {X} {Y} {Z} (f : SET [ X , Y ]) (g : SET [ Y , Z ])
          (x : List X) → list (SET [ f >> g ]) x == (SET [ list f >> list g ]) x
-    yelp f g [] = refl []
-    yelp f g (x ,- xs) rewrite yelp f g xs = refl _
+    yelp f g [] = refl
+    yelp f g (x ,- xs) rewrite yelp f g xs = refl
 
 
 
@@ -124,9 +145,75 @@ module NAT-TRANS where
 
 open NAT-TRANS
 
-LIST_TO_MAYBE : LIST ~~> MAYBE
-LIST_TO_MAYBE = record
+LIST-TO-MAYBE : LIST ~~> MAYBE
+LIST-TO-MAYBE = record
   { hoist = λ { X [] → nothing ; X (x ,- _) → just x }
-  ; nat = extensionality λ { [] → refl _ ; (x ,- x₁) → refl _ }
+  ; nat = extensionality λ { [] → refl ; (x ,- x₁) → refl }
   }
+
+infix 4 _,_,_
+record Sg2 (A B : Set) (C : A -> B -> Set) : Set where
+  constructor _,_,_
+  field
+    fst : A
+    snd : B
+    sg2 : C fst snd
+
+module COMMA where
+  open Category
+  open _=>_
+
+  Comma : {A B C : Category} -> (A => C) -> (B => C) -> Category
+  Category.Obj (Comma {A} {B} {C} S T)
+    = Sg2 (Obj A) (Obj B) (\a b -> C [ F-Obj S a , F-Obj T b ])
+  Category._~>_ (Comma {A} {B} {C} S T) (a , b , h) (a' , b' , h')
+    = Sg2 (A [ a , a' ]) (B [ b , b' ]) \ f g -> C [ F-map S f >> h' ]
+                                              == C [ h >> F-map T g ]
+  Category.id (Comma {A} {B} {C} S T) {A = ( a , b , h )}
+    = id A
+    , id B
+    , ( begin
+          C [ F-map S (id A {a}) >> h ]
+        =[ cong! (F-map-id S a) ]
+          C [ id C {F-Obj S a} >> h ]
+        =[ cong! (id-l C h) ]
+          h
+        =[ cong! (sym (id-r C h)) ]
+          C [ h >> id C {F-Obj T b} ]
+        =[ cong! (sym (F-map-id T b)) ]
+          C [ h >> F-map T (id B {b}) ]
+        done
+      )
+  Category._>>_ (Comma {A} {B} {C} S T) {A = (a1 , b1 , f)}
+                                        {B = (a2 , b2 , g)}
+                                        {C = (a3 , b3 , h)}
+                                        (a , b , p)
+                                        (a' , b' , p')
+    = A [ a >> a' ]
+    , B [ b >> b' ]
+    , ( begin
+          C [ F-map S (A [ a >> a' ]) >> h ]
+        =[ cong! (F-map->> S a a') ]
+          C [ C [ F-map S a >> F-map S a' ] >> h ]
+        =[ sym (>>-assoc C (F-map S a) (F-map S a') h) ]
+          C [ F-map S a >> C [ F-map S a' >> h ] ]
+        =[ cong (\x -> C [ F-map S a >> x ] ) p' ]
+          C [ F-map S a >> C [ g >> F-map T b' ] ]
+        =[ >>-assoc C (F-map S a) g (F-map T b') ]
+          C [ C [ F-map S a >> g ] >> F-map T b' ]
+        =[ cong (\x -> C [ x >> F-map T b' ] ) p ]
+          C [ C [ f >> F-map T b ] >> F-map T b' ]
+        =[ sym (>>-assoc C f (F-map T b) (F-map T b')) ]
+          C [ f >> C [ F-map T b >> F-map T b' ] ]
+        =[ cong! (sym (F-map->> T b b')) ]
+          C [ f >> F-map T (B [ b >> b' ]) ]
+        done
+      )
+  Category.id-l (Comma {A} {B} {C} S T) = {!!}
+  Category.id-r (Comma {A} {B} {C} S T) = {!!}
+  Category.>>-assoc (Comma {A} {B} {C} S T) = {!!}
+
+-- p' : C [ F-map S a' >> h ] == C [ g >> F-map T b' ]
+-- p  : C [ F-map S a >> g ] == C [ f >> F-map T b ]
+
 
