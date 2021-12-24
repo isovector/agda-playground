@@ -157,62 +157,111 @@ record Sg2 (A B : Set) (C : A -> B -> Set) : Set where
     snd : B
     sg2 : C fst snd
 
-module COMMA where
+module COMMA {A B C : Category} (S : A => C) (T : B => C) where
   open Category
   open _=>_
 
+  mkIdProof : ∀
+              (a : Category.Obj A)
+              (b : Category.Obj B)
+              (h : C [ F-Obj S a , F-Obj T b ]) →
+            C [ F-map S (Category.id A) >> h ] ==
+            C [ h >> F-map T (Category.id B) ]
+  mkIdProof a b h =
+    begin
+      C [ F-map S (id A {a}) >> h ]  =[ cong! (F-map-id S a) ]
+      C [ id C {F-Obj S a} >> h ]    =[ cong! (id-l C h) ]
+      h                              =[ cong! (sym (id-r C h)) ]
+      C [ h >> id C {F-Obj T b} ]    =[ cong! (sym (F-map-id T b)) ]
+      C [ h >> F-map T (id B {b}) ]
+    done
+
+  mkCompProof : ∀
+                {a1 : Obj A}
+                {b1 : Obj B}
+                (f : C [ F-Obj S a1 , F-Obj T b1 ])
+                {a2 : Obj A}
+                {b2 : Obj B}
+                (g : C [ F-Obj S a2 , F-Obj T b2 ])
+                {a3 : Obj A}
+                {b3 : Obj B}
+                (h : C [ F-Obj S a3 , F-Obj T b3 ])
+                (a : A [ a1 , a2 ])
+                (b : B [ b1 , b2 ])
+                (p : C [ F-map S a >> g ] == C [ f >> F-map T b ])
+                (a' : A [ a2 , a3 ])
+                (b' : B [ b2 , b3 ])
+                (p' : C [ F-map S a' >> h ] == C [ g >> F-map T b' ]) →
+              C [ F-map S (A [ a >> a' ]) >> h ] ==
+              C [ f >> F-map T (B [ b >> b' ]) ]
+  mkCompProof {a1} {b1} f {a2} {b2} g {a3} {b3} h a b p a' b' p' =
+    begin
+      C [ F-map S (A [ a >> a' ]) >> h ]        =[ cong! (F-map->> S a a') ]
+      C [ C [ F-map S a >> F-map S a' ] >> h ]  =[ sym (>>-assoc C (F-map S a) (F-map S a') h) ]
+      C [ F-map S a >> C [ F-map S a' >> h ] ]  =[ cong (\x -> C [ F-map S a >> x ] ) p' ]
+      C [ F-map S a >> C [ g >> F-map T b' ] ]  =[ >>-assoc C (F-map S a) g (F-map T b') ]
+      C [ C [ F-map S a >> g ] >> F-map T b' ]  =[ cong (\x -> C [ x >> F-map T b' ] ) p ]
+      C [ C [ f >> F-map T b ] >> F-map T b' ]  =[ sym (>>-assoc C f (F-map T b) (F-map T b')) ]
+      C [ f >> C [ F-map T b >> F-map T b' ] ]  =[ cong! (sym (F-map->> T b b')) ]
+      C [ f >> F-map T (B [ b >> b' ]) ]
+    done
+
+
   {-# TERMINATING #-}
-  Comma : {A B C : Category} -> (A => C) -> (B => C) -> Category
-  Category.Obj (Comma {A} {B} {C} S T)
+  Comma : Category
+  Category.Obj (Comma)
     = Sg2 (Obj A) (Obj B) (\a b -> C [ F-Obj S a , F-Obj T b ])
-  Category._~>_ (Comma {A} {B} {C} S T) (a , b , h) (a' , b' , h')
+  Category._~>_ (Comma) (a , b , h) (a' , b' , h')
     = Sg2 (A [ a , a' ]) (B [ b , b' ]) \ f g -> C [ F-map S f >> h' ]
                                               == C [ h >> F-map T g ]
-  Category.id (Comma {A} {B} {C} S T) {A = ( a , b , h )}
+  Category.id (Comma) {A = z@( a , b , h )}
     = id A {a}
     , id B {b}
-    , ( begin
-          C [ F-map S (id A {a}) >> h ]  =[ cong! (F-map-id S a) ]
-          C [ id C {F-Obj S a} >> h ]    =[ cong! (id-l C h) ]
-          h                              =[ cong! (sym (id-r C h)) ]
-          C [ h >> id C {F-Obj T b} ]    =[ cong! (sym (F-map-id T b)) ]
-          C [ h >> F-map T (id B {b}) ]
-        done
-      )
-  Category._>>_ (Comma {A} {B} {C} S T) {A = (a1 , b1 , f)}
-                                        {B = (a2 , b2 , g)}
-                                        {C = (a3 , b3 , h)}
-                                        (a , b , p)
-                                        (a' , b' , p')
+    , mkIdProof a b h
+  Category._>>_ (Comma) {A = (a1 , b1 , f)}
+                        {B = (a2 , b2 , g)}
+                        {C = (a3 , b3 , h)}
+                        (a , b , p)
+                        (a' , b' , p')
     = A [ a >> a' ]
     , B [ b >> b' ]
-    , ( begin
-          C [ F-map S (A [ a >> a' ]) >> h ]        =[ cong! (F-map->> S a a') ]
-          C [ C [ F-map S a >> F-map S a' ] >> h ]  =[ sym (>>-assoc C (F-map S a) (F-map S a') h) ]
-          C [ F-map S a >> C [ F-map S a' >> h ] ]  =[ cong (\x -> C [ F-map S a >> x ] ) p' ]
-          C [ F-map S a >> C [ g >> F-map T b' ] ]  =[ >>-assoc C (F-map S a) g (F-map T b') ]
-          C [ C [ F-map S a >> g ] >> F-map T b' ]  =[ cong (\x -> C [ x >> F-map T b' ] ) p ]
-          C [ C [ f >> F-map T b ] >> F-map T b' ]  =[ sym (>>-assoc C f (F-map T b) (F-map T b')) ]
-          C [ f >> C [ F-map T b >> F-map T b' ] ]  =[ cong! (sym (F-map->> T b b')) ]
-          C [ f >> F-map T (B [ b >> b' ]) ]
-        done
-      )
-  Category.id-l (Comma {A} {B} {C} S T) {A = a1 , b1 , sa->tb1} {B = a2 , b2 , sa->tb2} (f , g , proof) =
+    , mkCompProof f g h a b p a' b' p'
+  Category.id-l (Comma) {A = a1 , b1 , sa->tb1} {B = a2 , b2 , sa->tb2} (f , g , proof) =
     begin
-      Comma S T [ (id (Comma S T)) >> (f , g , proof) ]
+      Comma [ (id (Comma)) >> (f , g , proof) ]
     =[]
-      Comma S T [ (id A , id B , ?) >> (f , g , proof) ]
-    =[ ? ]
-      ?
-    --   Comma S T [ (id A , id B , sg2 ?) >> (f , g , proof) ]
-    -- =[]
-    --   (A [ id A >> f ] , B [ id B >> g ] , _)
-    -- =[ cong (\x -> x , B [ id B >> g ] , _) (id-l A f) ]
-    --   (f , B [ id B >> g ] , ?)
-    -- =[ cong (\x -> f , x , _) (id-l B g) ]
-    --   f , g , proof
-    -- done
-  Category.id-r (Comma {A} {B} {C} S T) = {!!}
-  Category.>>-assoc (Comma {A} {B} {C} S T) = {!!}
+      Comma [ (id A , id B , mkIdProof a1 b1 sa->tb1) >> (f , g , proof) ]
+    =[]
+      ( A [ id A >> f ]
+      , B [ id B >> g ]
+      , mkCompProof sa->tb1 sa->tb1 sa->tb2 (id A) (id B) (mkIdProof a1 b1 sa->tb1) f g proof
+      )
+    =[ cong (\id-a -> id-a , B [ id B >> g ] , help id-a ) (id-l A f) ]
+      ( f
+      , B [ id B >> g ]
+      , trans proof (cong (\x -> C [ sa->tb1 >> F-map T x ]) (sym (id-l B g)))
+      )
+    =[ cong (\id-b -> f , id-b , help' id-b) (id-l B g) ]
+      ( f
+      , g
+      , proof
+      )
+    done
+
+    where
+      help : ∀ (id-a : A [ a1 , a2 ])  →
+            C [ F-map S id-a >> sa->tb2 ] ==
+            C [ sa->tb1 >> F-map T (B [ id B >> g ]) ]
+      help id-a = {!!}
+
+
+      help' : ∀ (id-b : B [ b1 , b2 ]) →
+        C [ _=>_.F-map S f >> sa->tb2 ] ==
+        C [ sa->tb1 >> _=>_.F-map T id-b ]
+      help' = {!!}
+
+
+  Category.id-r (Comma) = {!!}
+  Category.>>-assoc (Comma) = {!!}
 
 
