@@ -2,36 +2,7 @@
 
 module Cat2 where
 
-open import Relation.Binary.PropositionalEquality renaming (_≡_ to _==_; [_] to [[_]])
-open import Tactic.Rewrite using (cong!)
-
-infix 3 _done
-infixr 2 _=[]_ step-=
-infix 1 begin_
-
-begin_ : {A : Set} -> A -> A
-begin_ x = x
-
-_=[]_ : {A : Set} (x : A) -> {y : A} -> x == y -> x == y
-_=[]_ _ x = x
-
-step-= : {A : Set} (x : A) -> {y z : A} -> y == z -> x == y -> x == z
-step-= _ yz xy = trans xy yz
-
-syntax step-= x yz xy = x =[ xy ] yz
-
-_done : {A : Set} -> (x : A) -> x == x
-_done _ = refl
-
-
-
-
-postulate
-  extensionality : {S : Set}{T : S -> Set}
-                   {f g : (x : S) -> T x} ->
-                   ((x : S) -> f x == g x) ->
-                   f == g
-
+open import Prelude
 
 
 record Category : Set where
@@ -149,14 +120,6 @@ LIST-TO-MAYBE = record
   ; nat = extensionality λ { [] → refl ; (x ,- x₁) → refl }
   }
 
-infix 4 _,_,_
-record Sg2 (A B : Set) (C : A -> B -> Set) : Set where
-  constructor _,_,_
-  field
-    fst : A
-    snd : B
-    sg2 : C fst snd
-
 uip : {A : Set} -> {x y : A} -> (p q : x == y) -> p == q
 uip refl refl = refl
 
@@ -184,11 +147,11 @@ module COMMA {A B C : Category} (S : A => C) (T : B => C) where
 
   comma-ext
       : {X Y : CommaObj}
-     -> (tau psi : CommaArr X Y)
+     -> {tau psi : CommaArr X Y}
      -> tau .f == psi .f
      -> tau .g == psi .g
      -> tau == psi
-  comma-ext (comma-hom _ _ h1) (comma-hom _ _ h2) f-eq g-eq
+  comma-ext {tau = comma-hom _ _ h1} {comma-hom _ _ h2} f-eq g-eq
     rewrite f-eq | g-eq | uip h1 h2
       = refl
 
@@ -200,7 +163,7 @@ module COMMA {A B C : Category} (S : A => C) (T : B => C) where
     = comma-hom
         (id A)
         (id B)
-        ( begin
+        (begin
           C [ F-map S (id A {a}) >> h ]  =[ cong! (F-map-id S a) ]
           C [ id C {F-Obj S a} >> h ]    =[ cong! (id-l C h) ]
           h                              =[ cong! (sym (id-r C h)) ]
@@ -229,11 +192,13 @@ module COMMA {A B C : Category} (S : A => C) (T : B => C) where
           done
         )
 
-  id-l Comma (comma-hom f g _) = comma-ext _ _ (id-l A f) (id-l B g)
-  id-r Comma (comma-hom f g _) = comma-ext _ _ (id-r A f) (id-r B g)
+  id-l Comma (comma-hom f g _) = comma-ext (id-l A f) (id-l B g)
+  id-r Comma (comma-hom f g _) = comma-ext (id-r A f) (id-r B g)
 
   >>-assoc Comma (comma-hom a-f b-f _)
                  (comma-hom a-g b-g _)
                  (comma-hom a-h b-h _)
-    = comma-ext _ _ (>>-assoc A a-f a-g a-h) (>>-assoc B b-f b-g b-h)
+    = comma-ext (>>-assoc A a-f a-g a-h) (>>-assoc B b-f b-g b-h)
+
+open COMMA public
 
